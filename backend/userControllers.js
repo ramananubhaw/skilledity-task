@@ -76,14 +76,19 @@ const logoutUser = (req,res) => {
   validateToken(req, res, () => {
       try {
           res.clearCookie("access_token");
-          res.status(300).redirect("/");
+          res.status(301).redirect("/");
       }
       catch (error) {
           console.log(error);
-          // res.status(500).json({message: "Error logging out."});
       }
   })
 };
+
+const activeSession = (req, res) => {
+  validateToken(req, res, () => {
+    res.status(200).json({message: "Session active."});
+  })
+}
 
 const changePassword = (req,res) => {
   validateToken(req, res, async (decoded) => {
@@ -113,4 +118,4 @@ const changePassword = (req,res) => {
   })
 }
 
-export {registerUser, loginUser, logoutUser, changePassword};
+export {registerUser, loginUser, logoutUser, activeSession, changePassword};

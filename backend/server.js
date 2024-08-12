@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import {dirname, join} from "path";
 import {fileURLToPath} from "url";
-import {registerUser, loginUser, logoutUser, changePassword} from "./userControllers.js";
+import {registerUser, loginUser, logoutUser, activeSession, changePassword} from "./userControllers.js";
 import connectDB from "./connectDB.js";
 
 dotenv.config();
@@ -27,7 +27,8 @@ app.get("/", (req,res) => {
 });
 app.post("/api/register", registerUser);
 app.post("/api/login", loginUser);
-app.get("/api/logout", logoutUser)
+app.get("/api/active", activeSession);
+app.get("/api/logout", logoutUser);
 app.post("/api/password", changePassword);
 
 connectDB()
