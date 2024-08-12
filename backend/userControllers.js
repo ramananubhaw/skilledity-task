@@ -1,11 +1,13 @@
 import users from "./users.js";
 import { hashPassword, verifyPassword } from "./passwordMiddlewares.js";
+import validateToken from "./validateToken.js";
+import jwt from "jsonwebtoken";
 import {generate} from "generate-password";
 
 const registerUser = async (req, res) => {
     try {
       const user_arr = req.body;
-      console.log(user_arr);
+      // console.log(user_arr);
       
       for (let i=0; i<user_arr.length; i++) {
         const user = await users.findOne({email_id: user_arr[i]["email_id"]})
@@ -19,7 +21,7 @@ const registerUser = async (req, res) => {
           strict: true
         })
         const name = user_arr[i]["name"];
-        console.log(name, password);
+        console.log(name, " - ", password);
         const hashedPassword = await hashPassword(password);
         user_arr[i]["hashedPassword"] = hashedPassword;
       }
@@ -48,6 +50,20 @@ const loginUser = async (req, res) => {
       res.status(400).json({message: "Incorrect password."});
       return;
     }
+    const accessToken = jwt.sign({
+        user: {
+            email_id: username,
+            id: user._id
+        }
+    }, process.env.SECRET_ACCESS_TOKEN, {
+        expiresIn: process.env.JWT_TOKEN_EXPIRY_TIME // increase expiration time for JWT token in production
+    });
+    res.cookie("access_token", accessToken, {
+        // httpOnly: true,
+        // secure: true,
+        sameSite: "strict",
+        maxAge: process.env.AUTHENTICATION_COOKIE_EXPIRY_TIME // increase expiration time of cookie in production
+    }); // enable the httpOnly and secure flags in production
     res.status(200).json({message: "Logged in successfully."});
   }
   catch(error) {
@@ -56,4 +72,45 @@ const loginUser = async (req, res) => {
   }
 }
 
-export {registerUser, loginUser};
+const logoutUser = (req,res) => {
+  validateToken(req, res, () => {
+      try {
+          res.clearCookie("access_token");
+          res.status(300).redirect("/");
+      }
+      catch (error) {
+          console.log(error);
+          // res.status(500).json({message: "Error logging out."});
+      }
+  })
+};
+
+const changePassword = (req,res) => {
+  validateToken(req, res, async (decoded) => {
+    try {
+      const {oldPassword, newPassword} = req.body;
+      const email_id = decoded.user.email_id;
+      const user = await users.findOne({email_id: email_id}).select({hashedPassword: 1});
+      if (!user) {
+        res.status(404).json({message: "User not found."});
+        return;
+      }
+      const verify = verifyPassword(oldPassword, user.hashedPassword);
+      if (!verify) {
+        res.status(404).json({message: "Incorrect old password."});
+        return;
+      }
+      const newHashedPassword = await hashPassword(newPassword);
+      await users.findOneAndUpdate({email_id}, {hashedPassword: newHashedPassword}, {new: true});
+      console.log("Old - " + oldPassword)
+      console.log("New - " + newPassword)
+      res.status(200).json({message: "Password updated. Logging out"})
+    }
+    catch(error) {
+      console.log(error);
+      res.status(500).json({message: "Internal server error."});
+    }
+  })
+}
+
+export {registerUser, loginUser, logoutUser, changePassword};
